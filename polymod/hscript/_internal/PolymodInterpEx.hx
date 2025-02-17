@@ -194,6 +194,21 @@ class PolymodInterpEx extends Interp
 		return _scriptClassDescriptors.get(name);
 	}
 
+	private static var _scriptEnumDescriptor:Map<String, EnumDecl> = new Map<String, EnumDecl>();
+
+	private static function registerScriptEnum(e:EnumDecl) 
+	{
+		var name = e.name;
+
+		if (_scriptEnumDescriptor.exists(name)) {
+			Polymod.error(SCRIPT_ENUM_ALREADY_REGISTERED, 'An enum with the fully qualified name "$name" has already been defined. Please change the enum name to ensure a unique name.');
+			return;
+		} else {
+			Polymod.debug('Registering enum $name');
+			_scriptEnumDescriptor.set(name, e);
+		}
+	}
+
 	override function setVar(id:String, v:Dynamic)
 	{
 		if (_proxy != null && _proxy.superClass != null)
@@ -1385,7 +1400,8 @@ class PolymodInterpEx extends Interp
 					};
 					registerScriptClass(classDecl);
 				case DTypedef(_):
-				case DEnum(_):
+				case DEnum(e):
+					registerScriptEnum(e);
 			}
 		}
 	}

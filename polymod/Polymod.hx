@@ -1325,6 +1325,13 @@ enum abstract PolymodErrorCode(String) from String to String
 	var SCRIPT_CLASS_MODULE_BLACKLISTED:String = 'script_class_module_blacklisted';
 
 	/**
+	 * You attempted to register a new enum with a name that is already in use.
+	 * - Rename the enum to one that is unique and will not conflict with other enums.
+	 * - If you need to clear all existing enum descriptors, call `Polymod.clearScripts()`.
+	 */
+	 var SCRIPT_ENUM_ALREADY_REGISTERED:String = 'script_enum_already_registered';
+
+	/**
 	 * One or more scripts are about to be parsed.
 	 * - This is an info message. You can log it or ignore it if you like.
 	 */

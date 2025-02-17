@@ -1385,6 +1385,7 @@ class PolymodInterpEx extends Interp
 					};
 					registerScriptClass(classDecl);
 				case DTypedef(_):
+				case DEnum(_):
 			}
 		}
 	}

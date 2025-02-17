@@ -478,6 +478,28 @@ class PolymodInterpEx extends Interp
 				// If there is a try/catch block, the error will be caught.
 				// If there is no try/catch block, the error will be reported.
 				errorEx(EScriptThrow(str));
+			
+			// Enums
+			case EField(e,f):
+				var name = getIdent(e);
+				if (name != null && _scriptEnumDescriptor.exists(name)) 
+				{
+					return new PolymodEnum(_scriptEnumDescriptor.get(name), f, []);
+				}
+			case ECall(e,params):
+				var args = new Array();
+				for (p in params)
+					args.push(expr(p));
+	
+				switch(Tools.expr(e)) {
+					case EField(e,f):
+						var name = getIdent(e);
+						if (name != null && _scriptEnumDescriptor.exists(name)) 
+						{
+							return new PolymodEnum(_scriptEnumDescriptor.get(name), f, args);
+						}
+					default:
+				}
 			default:
 				// Do nothing.
 		}
@@ -614,6 +636,21 @@ class PolymodInterpEx extends Interp
 		for( e in entries )
 			a.push(expr(e));
 		return a;
+	}
+
+	function getIdent(e:Expr):Null<String> {
+		#if hscriptPos
+		switch (e.e)
+		{
+		#else
+		switch (e)
+		{
+		#end
+			case EIdent(v):
+				return v;
+			default:
+				return null;
+		}
 	}
 
 	override function makeIterator(v:Dynamic):Iterator<Dynamic>

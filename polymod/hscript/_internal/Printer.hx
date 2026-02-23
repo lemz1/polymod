@@ -23,6 +23,7 @@
 package polymod.hscript._internal;
 
 import polymod.hscript._internal.Expr;
+import polymod.hscript._internal.TypedExpr;
 
 /**
  * Utility class for converting HScript elements into human-readable `String` representations.
@@ -44,6 +45,19 @@ class Printer
     buf = new StringBuf();
     tabs = "";
     expr(e);
+    return buf.toString();
+  }
+
+  /**
+   * Converts a Typed HScript AST node into a human-readable `String` representation.
+   * @param e The node to convert.
+   * @return String
+   */
+  public function typedExprToString(e:TypedExpr):String
+  {
+    buf = new StringBuf();
+    tabs = "";
+    typedExpr(e);
     return buf.toString();
   }
 
@@ -430,6 +444,405 @@ class Printer
         addType(t);
         add(")");
     }
+  }
+
+  function runtimeType(t:Type):Void
+  {
+    if (t == null)
+    {
+      add("Unknown");
+      return;
+    }
+
+    switch (t)
+    {
+      case TInt:
+        add("Int");
+
+      case TFloat:
+        add("Float");
+
+      case TBool:
+        add("Bool");
+
+      case TVoid:
+        add("Void");
+
+      case TDynamic:
+        add("Dynamic");
+
+      case TNull:
+        add("Null");
+
+      case TUnknown:
+        add("Unknown");
+
+      case TClass(c):
+        var name = Type.getClassName(c);
+        add(name != null ? name : "Class");
+
+      case TEnum(e):
+        var name = Type.getEnumName(e);
+        add(name != null ? name : "Enum");
+
+      case TAbstract(a):
+        var name = Type.getClassName(a);
+        add(name != null ? name : "Abstract");
+
+      case TFun(args, ret):
+        add("(");
+
+        var first = true;
+        for (a in args)
+        {
+          if (!first) add(", ");
+          first = false;
+
+          if (a.name != null) add(a.name + ":");
+
+          runtimeType(a.t);
+        }
+
+        add(") -> ");
+        runtimeType(ret);
+
+      case TAnonymous(fields):
+        add("{");
+
+        var first = true;
+        for (f in fields)
+        {
+          if (!first) add(", ");
+          first = false;
+
+          if (f.opt) add("?");
+
+          add(f.name + ":");
+          runtimeType(f.t);
+        }
+
+        add("}");
+    }
+  }
+
+  function addTypedConst(c:TypedConst):Void
+{
+  switch (c)
+  {
+    case TCInt(i):
+      add(i);
+    case TCFloat(f):
+      add(f);
+    case TCBool(b):
+      add(b ? "true" : "false");
+    case TCString(s, _):
+      add('"');
+      add(s.split('"').join('\\"')
+        .split("\n").join("\\n")
+        .split("\r").join("\\r")
+        .split("\t").join("\\t"));
+      add('"');
+    case TCNull:
+      add("null");
+  }
+}
+
+  function typedExpr(e:TypedExpr):Void
+  {
+    if (e == null)
+    {
+      add("??NULL??");
+      return;
+    }
+
+    add("(");
+
+    switch (e.e)
+    {
+      case TEConst(c):
+        addTypedConst(c);
+
+      case TEIdent(v):
+        add(v);
+
+      case TEVar(n, t, e2):
+        add("var " + n);
+        addType(t);
+        if (e2 != null)
+        {
+          add(" = ");
+          typedExpr(e2);
+        }
+
+      case TEFinal(n, t, e2):
+        add("final " + n);
+        addType(t);
+        if (e2 != null)
+        {
+          add(" = ");
+          typedExpr(e2);
+        }
+
+      case TEParent(e2):
+        add("(");
+        typedExpr(e2);
+        add(")");
+
+      case TEBlock(el):
+        if (el.length == 0)
+        {
+          add("{}");
+        }
+        else
+        {
+          tabs += "\t";
+          add("{\n");
+          for (x in el)
+          {
+            add(tabs);
+            typedExpr(x);
+            add(";\n");
+          }
+          tabs = tabs.substr(1);
+          add("}");
+        }
+
+      case TEField(e2, f):
+        typedExpr(e2);
+        add("." + f);
+
+      case TEBinop(op, e1, e2):
+        typedExpr(e1);
+        add(" " + op + " ");
+        typedExpr(e2);
+
+      case TEUnop(op, prefix, e2):
+        if (prefix)
+        {
+          add(op);
+          typedExpr(e2);
+        }
+        else
+        {
+          typedExpr(e2);
+          add(op);
+        }
+
+      case TECall(e2, params):
+        typedExpr(e2);
+        add("(");
+
+        var first = true;
+        for (p in params)
+        {
+          if (!first) add(", ");
+          first = false;
+          typedExpr(p);
+        }
+
+        add(")");
+
+      case TEIf(cond, e1, e2):
+        add("if( ");
+        typedExpr(cond);
+        add(" ) ");
+        typedExpr(e1);
+
+        if (e2 != null)
+        {
+          add(" else ");
+          typedExpr(e2);
+        }
+
+      case TEWhile(cond, e2):
+        add("while( ");
+        typedExpr(cond);
+        add(" ) ");
+        typedExpr(e2);
+
+      case TEDoWhile(cond, e2):
+        add("do ");
+        typedExpr(e2);
+        add(" while( ");
+        typedExpr(cond);
+        add(" )");
+
+      case TEFor(v, it, e2):
+        add("for( " + v + " in ");
+        typedExpr(it);
+        add(" ) ");
+        typedExpr(e2);
+
+      case TEForGen(it, e2):
+        add("for( ");
+        typedExpr(it);
+        add(" ) ");
+        typedExpr(e2);
+
+      case TEBreak:
+        add("break");
+
+      case TEContinue:
+        add("continue");
+
+      case TEFunction(args, body, name, ret):
+        add("function");
+        if (name != null) add(" " + name);
+
+        add("(");
+
+        var first = true;
+        for (a in args)
+        {
+          if (!first) add(", ");
+          first = false;
+
+          if (a.opt == true) add("?");
+          add(a.name);
+          addType(a.t);
+        }
+
+        add(")");
+        addType(ret);
+        add(" ");
+        typedExpr(body);
+
+      case TEReturn(e2):
+        add("return");
+        if (e2 != null)
+        {
+          add(" ");
+          typedExpr(e2);
+        }
+
+      case TEArray(e2, index):
+        typedExpr(e2);
+        add("[");
+        typedExpr(index);
+        add("]");
+
+      case TEArrayDecl(arr):
+        add("[");
+        var first = true;
+        for (x in arr)
+        {
+          if (!first) add(", ");
+          first = false;
+          typedExpr(x);
+        }
+        add("]");
+
+      case TENew(cl, params):
+        add("new " + cl + "(");
+        var first = true;
+        for (p in params)
+        {
+          if (!first) add(", ");
+          first = false;
+          typedExpr(p);
+        }
+        add(")");
+
+      case TEThrow(e2):
+        add("throw ");
+        typedExpr(e2);
+
+      case TETry(e2, v, t, ecatch):
+        add("try ");
+        typedExpr(e2);
+        add(" catch( " + v);
+        addType(t);
+        add(" ) ");
+        typedExpr(ecatch);
+
+      case TEObject(fl):
+        if (fl.length == 0)
+        {
+          add("{}");
+        }
+        else
+        {
+          tabs += "\t";
+          add("{\n");
+          for (f in fl)
+          {
+            add(tabs);
+            add(f.name + " : ");
+            typedExpr(f.e);
+            add(",\n");
+          }
+          tabs = tabs.substr(1);
+          add("}");
+        }
+
+      case TETernary(c, e1, e2):
+        typedExpr(c);
+        add(" ? ");
+        typedExpr(e1);
+        add(" : ");
+        typedExpr(e2);
+
+      case TESwitch(e2, cases, def):
+        add("switch( ");
+        typedExpr(e2);
+        add(") {");
+
+        for (c in cases)
+        {
+          add("case ");
+          var first = true;
+          for (v in c.values)
+          {
+            if (!first) add(", ");
+            first = false;
+            typedExpr(v);
+          }
+          add(": ");
+          typedExpr(c.expr);
+          add(";\n");
+        }
+
+        if (def != null)
+        {
+          add("default: ");
+          typedExpr(def);
+          add(";\n");
+        }
+
+        add("}");
+
+      case TEMeta(name, args, e2):
+        add("@");
+        add(name);
+
+        if (args != null && args.length > 0)
+        {
+          add("(");
+          var first = true;
+          for (a in args)
+          {
+            if (!first) add(", ");
+            first = false;
+            typedExpr(a);
+          }
+          add(")");
+        }
+
+        add(" ");
+        typedExpr(e2);
+
+      case TECheckType(e2, t):
+        add("(");
+        typedExpr(e2);
+        add(" : ");
+        type(t);
+        add(")");
+    }
+
+    add(" : ");
+    runtimeType(e.t);
+
+    add(")");
   }
 
   /**
